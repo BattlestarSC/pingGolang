@@ -1,6 +1,7 @@
 package base
 
 import (
+	"fmt"
 	"golang.org/x/net/icmp"
 )
 
@@ -21,7 +22,8 @@ func CreateListener(configuration Configuration) (*icmp.PacketConn, error) {
 	}
 	//make listener
 	listener, err := icmp.ListenPacket(networkString, listenAddress)
-
+	//debug
+	fmt.Println(listener)
 	//return error and listener
 	return listener, err
 }

@@ -2,6 +2,7 @@ package base
 
 import (
 	"crypto/rand"
+	"fmt"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -65,8 +66,10 @@ func makePacket(configuration Configuration, seq chan int) ([]byte,icmp.Message,
 func Pinger(config Configuration, conn *icmp.PacketConn, sequenceChannel chan int, packetChannel chan icmp.Message) {
 	for {
 		packet,message,err := makePacket(config, sequenceChannel)
+		fmt.Println(packet)
 		if err != nil {
 			close(sequenceChannel)
+			fmt.Println("Fatal Error " + err.Error())
 			log.Fatal(err.Error())
 		}
 		var sendError error
@@ -83,7 +86,7 @@ func Pinger(config Configuration, conn *icmp.PacketConn, sequenceChannel chan in
 			log.Fatal(sendError.Error())
 		}
 		packetChannel <- message
-		//delay milliseconds to nanoseconds then sleep
-		time.Sleep(time.Duration(config.Delay * 1000000))
+		//delay milliseconds to nanoseconds (* 1m) then sleep
+		time.Sleep(time.Duration(config.Delay))
 	}
 }

@@ -10,10 +10,19 @@ import (
 func ResolveAddress(address string) (net.IP, bool, error) {
 	//convert to address
 	ip := net.ParseIP(address)
-	//if nil, its not an ip, so return an error
+	//if nil, its not an ip, try to resolve
 	var err error
 	if ip == nil {
-		err = errors.New("input is not a valid IP address")
+		//attempt to resolve a name
+		ips, erro := net.LookupIP(address)
+		//if that failed
+		if erro != nil {
+			err = errors.New("input is not a valid IP address or hostname")
+			return nil, false, err
+		} else {
+			//just attempt the first one
+			ip = ips[0]
+		}
 	} else {
 		err = nil
 	}

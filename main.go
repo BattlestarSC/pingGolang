@@ -50,6 +50,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	//debug
+	if *interfacePtr != "none" {
+		fmt.Println("Inteface selection not yet supported")
+		os.Exit(1)
+	}
+
 	//turn the address into an IP
 	addr, v6, err := base.ResolveAddress(address)
 
@@ -89,4 +95,8 @@ func main() {
 	packetChannel := make(chan icmp.Message)
 	//start the pinging go routine
 	go base.Pinger(config, listener, sequenceChan, packetChannel)
+
+	for {
+		fmt.Println(<- packetChannel)
+	}
 }
