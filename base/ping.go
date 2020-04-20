@@ -13,10 +13,10 @@ func Ping(configuration Configuration, output chan Response) {
 
 	//setup
 	//sequence number channel
-	seq := make(chan int)
+	seq := make(chan int, 1)
 	seq <- 1
 	//error channel
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 
 	//DEBUG
 	fmt.Println("DEBUG! Ping function in ping.go init channels created")
@@ -46,7 +46,7 @@ func Ping(configuration Configuration, output chan Response) {
 			return
 		}
 
-		seqId := <- seq
+		seqId := <-seq
 
 		//DEBUG
 		fmt.Println("DEBUG! Ping function in ping.go got seq ", seqId)
@@ -60,7 +60,7 @@ func Ping(configuration Configuration, output chan Response) {
 		//DEBUG
 
 		//if no error, continue to read
-		err = <- errChan
+		err = <-errChan
 		if nil != err {
 
 			//DEBUG

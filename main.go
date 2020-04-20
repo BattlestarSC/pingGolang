@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	base "pingCLI/base"
+	"pingGolang/base"
 	"strconv"
 	"time"
 )
@@ -28,7 +28,7 @@ func main() {
 	if delay == "" {
 		delay = "1s"
 	} else {
-		t,err := strconv.Atoi(delay)
+		t, err := strconv.Atoi(delay)
 		if err != nil {
 			fmt.Println("Invalid delay specification, need delay time in seconds, ex: 2")
 			fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
@@ -53,7 +53,7 @@ func main() {
 	//DEBUG
 	fmt.Println("DEBUG! Config creation => ", config)
 	//DEBUG
-	output := make(chan base.Response)
+	output := make(chan base.Response, 1)
 	//DEBUG
 	fmt.Println("DEBUG! Output channel created")
 	//DEBUG
@@ -64,13 +64,13 @@ func main() {
 
 	var total int = 0
 	var avgTi int64 = 0
-	var recv  int = 0
+	var recv int = 0
 
 	for {
 		//DEBUG
 		fmt.Println("DEBUG! Begin infinite loop")
 		//DEBUG
-		resp := <- output
+		resp := <-output
 		seq := resp.Seq
 		total++
 		//DEBUG
@@ -78,9 +78,9 @@ func main() {
 		//DEBUG
 		if resp.Received {
 			tim := resp.Latency.Nanoseconds() / 1000000
-			avgTi+=tim
+			avgTi += tim
 			recv++
-			fmt.Println("Response number " + strconv.Itoa(seq) + " from " + config.Target.Host + " in " + strconv.FormatInt(tim,10) + "ms")
+			fmt.Println("Response number " + strconv.Itoa(seq) + " from " + config.Target.Host + " in " + strconv.FormatInt(tim, 10) + "ms")
 		} else {
 			fmt.Println("No response for ping number " + strconv.Itoa(seq) + " with error " + resp.Err.Error())
 		}
@@ -91,7 +91,7 @@ func main() {
 func agStats(total int, averageTime int64, numberRecieved int) {
 	percRecv := (1 - (float64(numberRecieved) / float64(total))) * 100
 	avgTimeMs := averageTime / 1000000
-	avgTimeResult := avgTimeMs/int64(numberRecieved)
+	avgTimeResult := avgTimeMs / int64(numberRecieved)
 	fmt.Println("Aggregate stats: ")
 	fmt.Println(total, " pings sent ", numberRecieved, " received for ", percRecv, "percent loss")
 	fmt.Println(avgTimeResult, "ms average latency")
