@@ -16,6 +16,8 @@ type Configuration struct {
 	Target  Target
 	Delay   time.Duration
 	Timeout time.Duration
+	Count   int
+	Inf     bool
 }
 
 type Response struct {

@@ -22,7 +22,7 @@ func Ping(configuration Configuration, output chan Response) {
 	fmt.Println("DEBUG! Ping function in ping.go init channels created")
 	//DEBUG
 
-	for {
+	for !configuration.Inf && configuration.Count > 0 {
 
 		//DEBUG
 		fmt.Println("DEBUG! Ping function in ping.go started inf loop")
@@ -91,5 +91,17 @@ func Ping(configuration Configuration, output chan Response) {
 		//DEBUG
 		fmt.Println("DEBUG! Ping function in ping.go passed sleep of " + configuration.Delay.String())
 		//DEBUG
+
+		configuration.Count--
+
+		//DEBUG
+		fmt.Println("DEBUG! Ping function in ping.go reduced count to ", configuration.Count)
+		//DEBUG
+
+		//if we are done, kill the main function by closing the channel
+		if configuration.Count == 0 {
+			close(output)
+		}
+
 	}
 }

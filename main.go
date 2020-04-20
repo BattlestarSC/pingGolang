@@ -45,15 +45,22 @@ func main() {
 		fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
 		os.Exit(1)
 	}
+
+	//DEBUG TIMEOUT
+	tmout, _ := time.ParseDuration("5s")
+
 	config := base.Configuration{
 		Target:  result,
 		Delay:   configDelay,
-		Timeout: 0,
+		Timeout: tmout,
+		//DEBUG count
+		Count : 5,
+		Inf: false,
 	}
 	//DEBUG
 	fmt.Println("DEBUG! Config creation => ", config)
 	//DEBUG
-	output := make(chan base.Response, 1)
+	output := make(chan base.Response)
 	//DEBUG
 	fmt.Println("DEBUG! Output channel created")
 	//DEBUG
@@ -70,7 +77,14 @@ func main() {
 		//DEBUG
 		fmt.Println("DEBUG! Begin infinite loop")
 		//DEBUG
-		resp := <-output
+		resp, open := <-output
+
+		if !open {
+			fmt.Println("Encountered terminating error")
+			agStats(total, avgTi, recv)
+			return
+		}
+
 		seq := resp.Seq
 		total++
 		//DEBUG
@@ -89,7 +103,6 @@ func main() {
 				fmt.Println("No response for ping number " + strconv.Itoa(seq) + " with error " + resp.Err.Error())
 			}
 		}
-		agStats(total, avgTi, recv)
 	}
 }
 
