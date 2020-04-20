@@ -81,7 +81,7 @@ func recieve(conn net.Conn, seq int, timeSend time.Time, configuration Configura
 	out <- Response{
 		Seq:      seq,
 		Latency:  lat,
-		Received: false,
+		Received: true,
 		Err:      nil,
 	}
 

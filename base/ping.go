@@ -68,6 +68,12 @@ func Ping(configuration Configuration, output chan Response) {
 			//DEBUG
 
 			//otherwise die
+			output <- Response{
+				Seq:      seqId,
+				Latency:  0,
+				Received: false,
+				Err:      err,
+			}
 			close(output)
 			return
 		}
@@ -83,7 +89,7 @@ func Ping(configuration Configuration, output chan Response) {
 		time.Sleep(configuration.Delay)
 
 		//DEBUG
-		fmt.Println("DEBUG! Ping function in ping.go passed sleep")
+		fmt.Println("DEBUG! Ping function in ping.go passed sleep of " + configuration.Delay.String())
 		//DEBUG
 	}
 }

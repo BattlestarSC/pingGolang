@@ -82,16 +82,28 @@ func main() {
 			recv++
 			fmt.Println("Response number " + strconv.Itoa(seq) + " from " + config.Target.Host + " in " + strconv.FormatInt(tim, 10) + "ms")
 		} else {
-			fmt.Println("No response for ping number " + strconv.Itoa(seq) + " with error " + resp.Err.Error())
+			if resp.Err == nil {
+				//this should never happen, but apparently it does somehow
+				fmt.Println("No response for ping number " + strconv.Itoa(seq) + " ICMP timed out")
+			} else {
+				fmt.Println("No response for ping number " + strconv.Itoa(seq) + " with error " + resp.Err.Error())
+			}
 		}
 		agStats(total, avgTi, recv)
 	}
 }
 
 func agStats(total int, averageTime int64, numberRecieved int) {
-	percRecv := (1 - (float64(numberRecieved) / float64(total))) * 100
-	avgTimeMs := averageTime / 1000000
-	avgTimeResult := avgTimeMs / int64(numberRecieved)
+	var percRecv float64
+	var avgTimeResult int64
+	if numberRecieved > 0 {
+		percRecv = (1 - (float64(numberRecieved) / float64(total))) * 100
+		avgTimeMs := averageTime / 1000000
+		avgTimeResult = avgTimeMs / int64(numberRecieved)
+	} else {
+		percRecv = 0
+		avgTimeResult = 0
+	}
 	fmt.Println("Aggregate stats: ")
 	fmt.Println(total, " pings sent ", numberRecieved, " received for ", percRecv, "percent loss")
 	fmt.Println(avgTimeResult, "ms average latency")
