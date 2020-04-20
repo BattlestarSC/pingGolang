@@ -3,100 +3,96 @@ package main
 import (
 	"flag"
 	"fmt"
-	"golang.org/x/net/icmp"
-	"log"
-	"net"
 	"os"
-	"ping/base"
+	base "pingCLI/base"
+	"strconv"
+	"time"
 )
 
 func main() {
-	//get flag arguments
-	//count
-	countPtr := flag.Int("count", -1, "How many packets to send before terminating (default: inf)")
-	//byte count
-	bytesPtr := flag.Int("bytes", 16, "How many bytes to send in each packet (default: 16, max allowed: 256)")
-	//millisecond delay
-	delayPtr := flag.Int("delay", 1000, "How many milliseconds between pings (default: 1000, minimum: 500)")
-	//interface to use
-	interfacePtr := flag.String("interface", "none", "What interface to use")
-	//parse flags
 	flag.Parse()
-	//get the required non-flag argument
 	address := flag.Arg(0)
-
-	//check arguments
-	if net.ParseIP(address) == nil {
-		_, err := net.LookupIP(address)
+	result, err := base.CreateTarget(address)
+	//DEBUG
+	fmt.Println("DEBUG! Create target result and error=> ", result, err)
+	//DEBUG
+	if err != nil {
+		fmt.Println("Unable to find an address to ping, please double check address or usage")
+		fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
+		os.Exit(1)
+	}
+	delay := flag.Arg(1)
+	//DEBUG
+	fmt.Println("DEBUG! Delay flag ", delay)
+	//DEBUG
+	if delay == "" {
+		delay = "1s"
+	} else {
+		t,err := strconv.Atoi(delay)
 		if err != nil {
-			fmt.Println("Failed to get usable IP address")
-			fmt.Println("Usage: ping <flags> <IP address>")
+			fmt.Println("Invalid delay specification, need delay time in seconds, ex: 2")
+			fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
 			os.Exit(1)
 		}
+		delay = strconv.Itoa(t) + "s"
 	}
-
-	if *countPtr == 0 || *countPtr < -1 {
-		fmt.Println("Disallowed packet count value, valid range is 1...2147483647 or -1 for inf")
-		os.Exit(1)
-	}
-
-	if *bytesPtr > 256 || *bytesPtr < 16 {
-		fmt.Println("Disallowed packet size value, valid range is 16...256")
-		os.Exit(1)
-	}
-
-	if *delayPtr < 500 {
-		fmt.Println("Disallowed send speed, valid range is 500...2147483647")
-		os.Exit(1)
-	}
-
-	//debug
-	if *interfacePtr != "none" {
-		fmt.Println("Inteface selection not yet supported")
-		os.Exit(1)
-	}
-
-	//turn the address into an IP
-	addr, v6, err := base.ResolveAddress(address)
-
+	configDelay, err := time.ParseDuration(delay)
+	//DEBUG
+	fmt.Println("DEBUG! Delay parse => ", configDelay, err)
+	//DEBUG
 	if err != nil {
-		fmt.Println(err.Error())
-		log.Fatal(err.Error())
+		fmt.Println("Invalid delay specification, need delay time in seconds, ex: 2")
+		fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
+		os.Exit(1)
 	}
-
-	//build configuration
 	config := base.Configuration{
-		Target: addr,
-		Count:  *countPtr,
-		Bytes:  *bytesPtr,
-		Delay:  *delayPtr,
-		V6:     v6,
-		Interface: *interfacePtr,
+		Target:  result,
+		Delay:   configDelay,
+		Timeout: 0,
 	}
+	//DEBUG
+	fmt.Println("DEBUG! Config creation => ", config)
+	//DEBUG
+	output := make(chan base.Response)
+	//DEBUG
+	fmt.Println("DEBUG! Output channel created")
+	//DEBUG
+	go base.Ping(config, output)
+	//DEBUG
+	fmt.Println("DEBUG! After started base.Ping")
+	//DEBUG
 
-	//make the listener
-	listener, err := base.CreateListener(config)
-	//make sure it worked
-	if err != nil {
-		fmt.Println(err.Error())
-		if config.Interface != "none" {
-			fmt.Println("Please double check permissions on interface " + config.Interface)
-		}
-		log.Fatal(err.Error())
-	}
-	//remember to close on exit, errors are irrelevant
-	defer listener.Close()
-
-	//make a sequence channel
-	sequenceChan := make(chan int)
-	//init it
-	sequenceChan <- 1
-	//packet channel
-	packetChannel := make(chan icmp.Message)
-	//start the pinging go routine
-	go base.Pinger(config, listener, sequenceChan, packetChannel)
+	var total int = 0
+	var avgTi int64 = 0
+	var recv  int = 0
 
 	for {
-		fmt.Println(<- packetChannel)
+		//DEBUG
+		fmt.Println("DEBUG! Begin infinite loop")
+		//DEBUG
+		resp := <- output
+		seq := resp.Seq
+		total++
+		//DEBUG
+		fmt.Println("DEBUG! Got response: ", resp)
+		//DEBUG
+		if resp.Received {
+			tim := resp.Latency.Nanoseconds() / 1000000
+			avgTi+=tim
+			recv++
+			fmt.Println("Response number " + strconv.Itoa(seq) + " from " + config.Target.Host + " in " + strconv.FormatInt(tim,10) + "ms")
+		} else {
+			fmt.Println("No response for ping number " + strconv.Itoa(seq) + " with error " + resp.Err.Error())
+		}
+		agStats(total, avgTi, recv)
 	}
+}
+
+func agStats(total int, averageTime int64, numberRecieved int) {
+	percRecv := (1 - (float64(numberRecieved) / float64(total))) * 100
+	avgTimeMs := averageTime / 1000000
+	avgTimeResult := avgTimeMs/int64(numberRecieved)
+	fmt.Println("Aggregate stats: ")
+	fmt.Println(total, " pings sent ", numberRecieved, " received for ", percRecv, "percent loss")
+	fmt.Println(avgTimeResult, "ms average latency")
 }

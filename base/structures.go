@@ -1,13 +1,26 @@
 package base
 
-import "net"
+import "time"
 
-//Just hold configuration information
+//Target for ping
+//creation sanity checks addresses
+//and determines the connection type
+type Target struct {
+	Host string
+	ConnType string
+	V4 bool
+}
+
+//Application configuration
 type Configuration struct {
-	Target  net.IP//target address
-	Count   int   //how many to send
-	Bytes   int   //how many bytes to pack
-	Delay   int   //how many milliseconds between sends
-	V6      bool  //do we use ipv6 or not
-	Interface string //what interface do we use
+	Target  Target
+	Delay   time.Duration
+	Timeout time.Duration
+}
+
+type Response struct {
+	Seq      int
+	Latency  time.Duration
+	Received bool
+	Err      error
 }

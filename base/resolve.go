@@ -5,36 +5,44 @@ import (
 	"net"
 )
 
-//Take a string address and make an IP with it
-//Return IP, if it is ipV6 or not, and an error (if any)
-func ResolveAddress(address string) (net.IP, bool, error) {
-	//convert to address
-	ip := net.ParseIP(address)
-	//if nil, its not an ip, try to resolve
-	var err error
-	if ip == nil {
-		//attempt to resolve a name
-		ips, erro := net.LookupIP(address)
-		//if that failed
-		if erro != nil {
-			err = errors.New("input is not a valid IP address or hostname")
-			return nil, false, err
-		} else {
-			//just attempt the first one
-			ip = ips[0]
-		}
-	} else {
-		err = nil
-	}
-	//check for if it is IPv4 or v6
-	addr := ip.To4()
-	//if addr is not nil, its ipv4, otherwise its 6
-	var v6 bool
+//create a target structure and check the address
+func CreateTarget(address string) (Target, error) {
+	var addr   net.IP
+	var output Target
+	var addresses []net.IP
+	//first, parse the address
+	addr = net.ParseIP(address)
+	//if that fails
 	if addr == nil {
-		v6 = true
-	} else {
-		v6 = false
+		//attempt to resolve the name
+		addresses, _ = net.LookupIP(address)
+		//check length
+		if len(addresses) < 1 {
+			//this failed to find a suitable address
+			err := "Unable to find a suitable target address for hostname: " + address
+			return output, errors.New(err)
+		} else {
+			addr = addresses[0]
+		}
 	}
 
-	return ip, v6, err
+	//now that we have a valid ip, lets check for v4 or 6
+	if addr != nil {
+		if addr.To4() == nil {
+			output.ConnType = "ip6:ipv6-icmp"
+			output.V4 = false
+		} else {
+			output.ConnType = "ip4:icmp"
+			output.V4 = true
+		}
+	} else {
+		//This should never happen, but just in case
+		//assume ipv6
+		output.ConnType = "ip6:ipv6-icmp"
+		output.V4 = false
+	}
+	//and load the original address into the struct
+	//now that it has been proven to be accurate
+	output.Host = address
+	return output, nil
 }
