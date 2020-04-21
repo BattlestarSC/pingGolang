@@ -10,73 +10,87 @@ import (
 )
 
 func main() {
+
+	//create flags
+	countFlag := flag.Int("count", 0, "The number of pings to send before stopping (default: inf)")
+	delayFlag := flag.String("delay", "1s", "The amount of time between pings, specified in a time spec string, such as 1s (default: 1s)")
+	deltaFlag := flag.Int("stats-delta", 1, "The number of pings between aggregate stats are printed (default: 1)")
+	timeoutFlag := flag.String("timeout", "10s", "The amount of time allowed before a ping times out (default: 10s)")
+
 	flag.Parse()
 	address := flag.Arg(0)
 	result, err := base.CreateTarget(address)
-	//DEBUG
-	fmt.Println("DEBUG! Create target result and error=> ", result, err)
-	//DEBUG
+
 	if err != nil {
-		fmt.Println("Unable to find an address to ping, please double check address or usage")
-		fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
-		os.Exit(1)
-	}
-	delay := flag.Arg(1)
-	//DEBUG
-	fmt.Println("DEBUG! Delay flag ", delay)
-	//DEBUG
-	if delay == "" {
-		delay = "1s"
-	} else {
-		t, err := strconv.Atoi(delay)
-		if err != nil {
-			fmt.Println("Invalid delay specification, need delay time in seconds, ex: 2")
-			fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
-			os.Exit(1)
-		}
-		delay = strconv.Itoa(t) + "s"
-	}
-	configDelay, err := time.ParseDuration(delay)
-	//DEBUG
-	fmt.Println("DEBUG! Delay parse => ", configDelay, err)
-	//DEBUG
-	if err != nil {
-		fmt.Println("Invalid delay specification, need delay time in seconds, ex: 2")
-		fmt.Println("Usage: sudo ping <address or hostname> <time between pings, in seconds, optional>")
+		fmt.Println("Unable to find a suitable target, got error: ", err.Error())
+		usage()
 		os.Exit(1)
 	}
 
-	//DEBUG TIMEOUT
-	tmout, _ := time.ParseDuration("5s")
+	configDelay, err := time.ParseDuration(*delayFlag)
+
+	if err != nil {
+		fmt.Println("Invalid delay specification")
+		usage()
+		os.Exit(1)
+	}
+
+	minimumDelay,_ := time.ParseDuration("100ms")
+
+	if configDelay.Nanoseconds() < minimumDelay.Nanoseconds() {
+		fmt.Println("Invalid delay specification, under 100ms")
+		usage()
+		os.Exit(1)
+	}
+
+	if *countFlag < 0 {
+		fmt.Println("Negative count values are not permitted")
+		usage()
+		os.Exit(1)
+	}
+
+	var inf bool
+	inf = *countFlag == 0
+
+	tmout, err := time.ParseDuration(*timeoutFlag)
+
+	if err != nil {
+		fmt.Println("Invalid timeout time spec")
+		usage()
+		os.Exit(1)
+	}
+
+	if tmout.Nanoseconds() < minimumDelay.Nanoseconds() {
+		fmt.Println("Invalid timeout specification, under 100ms")
+		usage()
+		os.Exit(1)
+	}
+
+	if *deltaFlag < 1 {
+		fmt.Println("Invalid delta value")
+		usage()
+		os.Exit(1)
+	}
 
 	config := base.Configuration{
 		Target:  result,
 		Delay:   configDelay,
 		Timeout: tmout,
-		//DEBUG count
-		Count : 5,
-		Inf: false,
+		Count : *countFlag,
+		Inf: inf,
 	}
-	//DEBUG
-	fmt.Println("DEBUG! Config creation => ", config)
-	//DEBUG
+
 	output := make(chan base.Response)
-	//DEBUG
-	fmt.Println("DEBUG! Output channel created")
-	//DEBUG
+
 	go base.Ping(config, output)
-	//DEBUG
-	fmt.Println("DEBUG! After started base.Ping")
-	//DEBUG
+
 
 	var total int = 0
 	var avgTi int64 = 0
 	var recv int = 0
 
 	for {
-		//DEBUG
-		fmt.Println("DEBUG! Begin infinite loop")
-		//DEBUG
+
 		resp, open := <-output
 
 		if !open {
@@ -87,9 +101,7 @@ func main() {
 
 		seq := resp.Seq
 		total++
-		//DEBUG
-		fmt.Println("DEBUG! Got response: ", resp)
-		//DEBUG
+
 		if resp.Received {
 			tim := resp.Latency.Nanoseconds() / 1000000
 			avgTi += tim
@@ -98,10 +110,13 @@ func main() {
 		} else {
 			if resp.Err == nil {
 				//this should never happen, but apparently it does somehow
-				fmt.Println("No response for ping number " + strconv.Itoa(seq) + " ICMP timed out")
+				fmt.Println("No response for ping number " + strconv.Itoa(seq) + " unexpected unknown error")
 			} else {
 				fmt.Println("No response for ping number " + strconv.Itoa(seq) + " with error " + resp.Err.Error())
 			}
+		}
+		if total % *deltaFlag == 0 {
+			agStats(total, avgTi, recv)
 		}
 	}
 }
@@ -117,7 +132,37 @@ func agStats(total int, averageTime int64, numberRecieved int) {
 		percRecv = 0
 		avgTimeResult = 0
 	}
-	fmt.Println("Aggregate stats: ")
-	fmt.Println(total, " pings sent ", numberRecieved, " received for ", percRecv, "percent loss")
+	fmt.Print("Aggregate stats: ")
+	fmt.Print(total, " pings sent ", numberRecieved, " received for ", percRecv, "percent loss ")
 	fmt.Println(avgTimeResult, "ms average latency")
+}
+
+func usage() {
+	fmt.Println("Usage:")
+	fmt.Println(os.Args[0], " <flags> target")
+	fmt.Println()
+	fmt.Println("Target can be any of the following:")
+	fmt.Println("\t-Hostname, like google.com")
+	fmt.Println("\t-IPv4 address, like 8.8.8.8")
+	fmt.Println("\t-IPv6 address, like ::1")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println()
+	fmt.Println("Count")
+	fmt.Println("\tusage --count <number>")
+	fmt.Println("\tThe number of pings to send before stopping (default: inf)")
+	fmt.Println("Delay")
+	fmt.Println("\tusage --delay <time spec>")
+	fmt.Println("\tThe amount of time between pings, specified in a time spec string, such as 1s (default: 1s)")
+	fmt.Println("\tAllowed time spec endings are ms,s,m,h for milliseconds, seconds, minutes, and hours respectably")
+	fmt.Println("\tDurations less than 100ms are prohibited")
+	fmt.Println("Delta")
+	fmt.Println("\tusage --stats-delta <number>")
+	fmt.Println("The number of pings between aggregate stats are printed (default: 1)")
+	fmt.Println("Timeout")
+	fmt.Println("\tusage --timeout <time spec>")
+	fmt.Println("\tThe amount of time allowed before a ping times out (default: 10s)")
+	fmt.Println("\tAllowed time spec endings are ms,s,m,h for milliseconds, seconds, minutes, and hours respectably")
+	fmt.Println("\tDurations less than 100ms are prohibited")
+	fmt.Println()
 }
