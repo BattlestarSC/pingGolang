@@ -145,8 +145,9 @@ func agStats(total int, averageTime time.Duration, numberRecieved int) {
 func usage() {
 	fmt.Println()
 	fmt.Print("Usage: ")
-	fmt.Println(os.Args[0], " <flags> target")
+	fmt.Println("sudo", os.Args[0], " <flags> target")
 	fmt.Println("note: flags must go before target spec")
+	fmt.Println("note: without setuid, this command must be run as root via sudo")
 	fmt.Println()
 	fmt.Println("Target can be any of the following:")
 	fmt.Println("\t-Hostname, like google.com")
