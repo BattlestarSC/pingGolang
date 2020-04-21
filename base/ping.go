@@ -13,7 +13,7 @@ func Ping(configuration Configuration, output chan Response) {
 	//error channel
 	errChan := make(chan error, 1)
 
-	for !configuration.Inf && configuration.Count > 0 {
+	for (!configuration.Inf && configuration.Count > 0) || configuration.Inf {
 
 		//first create a channel
 		conn, err := Connection(configuration)

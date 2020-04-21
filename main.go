@@ -16,9 +16,16 @@ func main() {
 	delayFlag := flag.String("delay", "1s", "The amount of time between pings, specified in a time spec string, such as 1s (default: 1s)")
 	deltaFlag := flag.Int("stats-delta", 1, "The number of pings between aggregate stats are printed (default: 1)")
 	timeoutFlag := flag.String("timeout", "10s", "The amount of time allowed before a ping times out (default: 10s)")
+	helpFlag := flag.Bool("help", false, "Display help menu")
 
 	flag.Parse()
-	address := flag.Arg(0)
+
+	if *helpFlag {
+		usage()
+		os.Exit(0)
+	}
+
+	address := os.Args[len(os.Args) - 1]
 	result, err := base.CreateTarget(address)
 
 	if err != nil {
@@ -80,13 +87,13 @@ func main() {
 		Inf: inf,
 	}
 
-	output := make(chan base.Response)
+	output := make(chan base.Response, 1)
 
 	go base.Ping(config, output)
 
 
 	var total int = 0
-	var avgTi int64 = 0
+	avgTi, _ := time.ParseDuration("0s")
 	var recv int = 0
 
 	for {
@@ -103,10 +110,9 @@ func main() {
 		total++
 
 		if resp.Received {
-			tim := resp.Latency.Nanoseconds() / 1000000
-			avgTi += tim
+			avgTi += resp.Latency
 			recv++
-			fmt.Println("Response number " + strconv.Itoa(seq) + " from " + config.Target.Host + " in " + strconv.FormatInt(tim, 10) + "ms")
+			fmt.Println("Response number " + strconv.Itoa(seq) + " from " + config.Target.Host + " in " + strconv.FormatInt(resp.Latency.Milliseconds(), 10) + "ms")
 		} else {
 			if resp.Err == nil {
 				//this should never happen, but apparently it does somehow
@@ -115,31 +121,32 @@ func main() {
 				fmt.Println("No response for ping number " + strconv.Itoa(seq) + " with error " + resp.Err.Error())
 			}
 		}
-		if total % *deltaFlag == 0 {
+		if seq % *deltaFlag == 0 {
 			agStats(total, avgTi, recv)
 		}
 	}
 }
 
-func agStats(total int, averageTime int64, numberRecieved int) {
+func agStats(total int, averageTime time.Duration, numberRecieved int) {
 	var percRecv float64
 	var avgTimeResult int64
 	if numberRecieved > 0 {
 		percRecv = (1 - (float64(numberRecieved) / float64(total))) * 100
-		avgTimeMs := averageTime / 1000000
-		avgTimeResult = avgTimeMs / int64(numberRecieved)
+		avgTimeResult = averageTime.Milliseconds() / int64(total)
 	} else {
 		percRecv = 0
 		avgTimeResult = 0
 	}
 	fmt.Print("Aggregate stats: ")
-	fmt.Print(total, " pings sent ", numberRecieved, " received for ", percRecv, "percent loss ")
+	fmt.Print(total, " pings sent ", numberRecieved, " received for ", percRecv, " percent loss ")
 	fmt.Println(avgTimeResult, "ms average latency")
 }
 
 func usage() {
-	fmt.Println("Usage:")
+	fmt.Println()
+	fmt.Print("Usage: ")
 	fmt.Println(os.Args[0], " <flags> target")
+	fmt.Println("note: flags must go before target spec")
 	fmt.Println()
 	fmt.Println("Target can be any of the following:")
 	fmt.Println("\t-Hostname, like google.com")
@@ -148,20 +155,23 @@ func usage() {
 	fmt.Println()
 	fmt.Println("Flags:")
 	fmt.Println()
+	fmt.Println("Help")
+	fmt.Println("\tusage --help")
+	fmt.Println("\tDisplay this usage menu")
 	fmt.Println("Count")
 	fmt.Println("\tusage --count <number>")
 	fmt.Println("\tThe number of pings to send before stopping (default: inf)")
 	fmt.Println("Delay")
-	fmt.Println("\tusage --delay <time spec>")
-	fmt.Println("\tThe amount of time between pings, specified in a time spec string, such as 1s (default: 1s)")
+	fmt.Println("\tusage --delay \"<time spec>\"")
+	fmt.Println("\tThe amount of time between pings, specified in a time spec string, such as 1s (default: \"1s\")")
 	fmt.Println("\tAllowed time spec endings are ms,s,m,h for milliseconds, seconds, minutes, and hours respectably")
 	fmt.Println("\tDurations less than 100ms are prohibited")
 	fmt.Println("Delta")
 	fmt.Println("\tusage --stats-delta <number>")
 	fmt.Println("The number of pings between aggregate stats are printed (default: 1)")
 	fmt.Println("Timeout")
-	fmt.Println("\tusage --timeout <time spec>")
-	fmt.Println("\tThe amount of time allowed before a ping times out (default: 10s)")
+	fmt.Println("\tusage --timeout \"<time spec>\"")
+	fmt.Println("\tThe amount of time allowed before a ping times out (default: \"10s\")")
 	fmt.Println("\tAllowed time spec endings are ms,s,m,h for milliseconds, seconds, minutes, and hours respectably")
 	fmt.Println("\tDurations less than 100ms are prohibited")
 	fmt.Println()
