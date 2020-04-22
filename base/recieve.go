@@ -1,7 +1,6 @@
 package base
 
 import (
-	"fmt"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -17,9 +16,7 @@ func recieve(conn net.Conn, seq int, timeSend time.Time, configuration Configura
 
 	//if err, assume it timed out
 	if err != nil {
-		//DEBUG
-		fmt.Println("DEBUG! recieve func in recieve.go connection read error terminated")
-		//DEBUG
+		
 		out <- Response{
 			Seq:      seq,
 			Latency:  -1,
